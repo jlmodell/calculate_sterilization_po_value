@@ -53,6 +53,20 @@ def get_data(file: str):
     return data
 
 
+def get_cost_from_db(item: str):
+    doc = costs.find_one(
+        {
+            "alias": item,
+        }
+    )
+
+    if not doc:
+        return 0
+
+    if doc:
+        return doc["cost"]
+
+
 def calculate_average_price(item: str):
     docs = list(
         contracts.find(
@@ -100,8 +114,11 @@ def main():
     for item in data:
         item["average_price"] = calculate_average_price(item["item"])
         item["average_value"] = item["average_price"] * item["quantity"]
+        item["cost"] = get_cost_from_db(item["item"])
+        item["cost_value"] = item["cost"] * item["quantity"]
 
     total_value = sum([item["average_value"] for item in data])
+    total_cost = sum([item["cost_value"] for item in data])
 
     output_file = f"Avg Value of PO {PO} - {total_value:,.2f}.txt"
 
@@ -111,14 +128,20 @@ def main():
                 f"{idx + 1}.\tItem {val['item']} \
                     \n\tLot {val['lot']} - Exp {val['expiry']} \
                     \n\t{val['quantity']} CS \
-                    \n\t$ {val['average_price']:,.2f} / CS (on avg) \
-                    \n\t$ {val['average_value']:,.2f}\n"
+                    \n\t$ {val['average_price']:,.2f} / CS (price/cs on avg) \
+                    \n\t$ {val['average_value']:,.2f} (value) \
+                    \n\t$ {val['cost']:,.2f} / CS (cost/cs) *not including fees rebates etc* \
+                    \n\t$ {val['cost_value']:,.2f} (cost) \
+                    \n\t----------------------------------- \
+                    \n\t$ {val['average_value'] - val['cost_value']:,.2f} (value - cost) \n"
             )
 
-        print(
-            f"Average value of PO {PO} is",
-            f"$ {total_value:,.2f}",
-        )
+        print(f"Average value of PO {PO} is\t $ {total_value:,.2f}")
+        print(f"Current* cost of PO {PO} is\t $ {total_cost:,.2f}")
+        print("---------------------------------------------")
+        print(f"Average profit of PO {PO} is\t $ {total_value - total_cost:,.2f}")
+
+        print(f"\n\t\t\t\t\t*{datetime.now():%m-%d-%Y}")
 
 
 if __name__ == "__main__":
